@@ -18,13 +18,13 @@ mode and it does that by updating state stored in flash and rebooting. When the
 setup has completed, the setup does the reverse transition which reactivates the
 application with a (potentially) new configuration.
 
-## Application
+### Application
 The application is a small network-connected service that contacts an NTP
 server on the public internet as an example of using the configured WiFi. It can
 easily be extended to read measurements from sensors and publishing them through
 protocols like MQTT.
 
-## Setup
+### Setup
 The setup functionality relies on establishing a WiFi in AP (access point) mode
 and running a captive portal that redirects users that connect to the WiFi to
 a web page that asks them to update the WiFi credentials.
