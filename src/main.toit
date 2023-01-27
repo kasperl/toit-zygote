@@ -2,10 +2,15 @@
 // Use of this source code is governed by a Zero-Clause BSD license that can
 // be found in the LICENSE file.
 
+import esp32
 import log
 import net
+import ntp
 
 import .mode as mode
+
+RETRIES ::= mode.DEVELOPMENT ? 2 : 5
+PERIOD  ::= mode.DEVELOPMENT ? (Duration --s=10) : (Duration --m=1)
 
 main:
   // If the setup container is supposed to run, we allow
@@ -14,18 +19,31 @@ main:
   // interfering with each other.
   if not mode.RUNNING: return
 
-  if mode.DEVELOPMENT: log.info "running in development"
-
-  while true:
+  retries := 0
+  while ++retries < RETRIES:
     network/net.Interface? := null
-    try:
+    exception := catch --trace:
       network = net.open
-      // TODO(kasper): Check that the network has a connection.
       run network
-    finally:
-      if network: network.close
+      retries = 0
+    if network: network.close
+    sleep PERIOD
+
+  // We keep failing to connect or run the app. We assume
+  // that this is because we've got the wrong WiFi credentials
+  // so we enter the setup mode.
+  mode.run_setup
 
 run network/net.Interface:
-  // TODO(kasper): Do something with the network.
-  sleep (Duration --s=5)
-  if (random 100) < 5: mode.run_setup
+  tags/Map? := null
+  if mode.DEVELOPMENT: tags = {"mode": "development"}
+
+  while true:
+    log.info "running" --tags=tags
+    result := ntp.synchronize --network=network
+    if result:
+      log.info "contacted ntp server" --tags={
+        "adjustment" : result.adjustment,
+        "accuracy"   : result.accuracy,
+      }
+    sleep PERIOD

@@ -15,23 +15,40 @@ For development, I recommend using [Jaguar](https://github.com/toitlang/jaguar) 
 the Visual Studio code extension for Toit. You can find more information on how to
 get started in this [brief guide](https://github.com/toitlang/toit/discussions/244).
 
-To get going, you will need to flash your device with firmware that contains the
-Jaguar service via a serial connection. Doing this will ask you for your WiFi credentials
-and you need to make sure that the device and your development host are on the
-same network:
+Start by installing the packages the example depends on using:
 
+``` sh
+jag pkg install
 ```
+
+As the next step, you will need to flash your device with firmware that contains
+the Jaguar service via a serial connection. Doing this will ask you for your WiFi
+credentials and you need to make sure that the device and your development host
+are on the same network:
+
+``` sh
 jag flash
 ```
 
 You can configure the default WiFi credentials using `jag config wifi set`, so
 Jaguar will stop nagging you about this information whenever you flash.
 
-Now that Jaguar runs on your device, you can run the development version of the main
-application like this:
+Now that Jaguar runs on your device, you can install the development version of
+the setup container that takes care of provisioning the WiFi in case your device
+looses connectivty. The setup container will establish a WiFi access point, so
+it needs to run with Jaguar disabled in order to not fight over the network. We
+provide a timeout to it too, so that any bugs in the code will lead to giving
+back control to Jaguar. You install it like this:
 
 ``` sh
-jag run src/main.toit
+jag container install setup src/setup.toit -D jag.disabled -D jag.timeout=2m
+```
+
+Now you can start iterating on the main application by installing and
+re-installing the application container to test out the new code:
+
+``` sh
+jag container install app src/main.toit
 ```
 
 # Deployment
