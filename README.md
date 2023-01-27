@@ -11,12 +11,13 @@ so feel free to copy the code and use it for your own purposes.
 
 # Architecture
 
-The functionality of this example is split in two: The application and the setup.
-The are independent and installed in separate containers, because they never actually
-run at the same time. The idea is that the application can decide to go into setup
-mode and it does that by updating state stored in flash and rebooting. When the
-setup has completed, the setup does the reverse transition which reactivates the
-application with a (potentially) new configuration.
+The functionality of this example is split in two: The [application](src/main.toit)
+and the [setup](src/setup.toit). They are independent and installed in separate
+containers, because they never actually run at the same time. The idea is that the
+application can decide to go into setup mode and it does that by updating state
+stored in flash and rebooting. When the setup has completed, the setup does the
+ßreverse transition which reactivates the application with a (potentially) new
+configuration.
 
 ### Container: Application
 The application is a small network-connected service that contacts an NTP
