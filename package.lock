@@ -1,0 +1,17 @@
+prefixes:
+  dns_simple_server: pkg-dns-simple-server
+  http: pkg-http
+  ntp: pkg-ntp
+packages:
+  pkg-dns-simple-server:
+    url: github.com/toitlang/pkg-dns-simple-server
+    version: 0.2.1
+    hash: 10476712e5140d40b9f593530aca50045ba41671
+  pkg-http:
+    url: github.com/toitlang/pkg-http
+    version: 1.9.3
+    hash: 108c436cc990535f5d70c380ef68081c38840f4c
+  pkg-ntp:
+    url: github.com/toitlang/pkg-ntp
+    version: 1.0.0
+    hash: 1c3cc4a4819f459393f00efc576f66f838665719
