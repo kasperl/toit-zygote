@@ -95,7 +95,7 @@ run timeout/Duration:
       log.warn "connecting to wifi in STA mode => failed" --tags=credentials
 
 run_captive_portal network/net.Interface access_points/List -> Map:
-  results := Task.divide --required=1 [
+  results := Task.group --required=1 [
     :: run_dns network,
     :: run_http network access_points,
   ]
