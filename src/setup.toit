@@ -94,52 +94,12 @@ run timeout/Duration:
         return
       log.warn "connecting to wifi in STA mode => failed" --tags=credentials
 
-run_captive_portal network/net.Interface access_points/List -> Map?:
-  // We run two tasks concurrently: One acts as a DNS server
-  // that resolves all address to the device IP and one serves
-  // incoming HTTP requests. If one of the tasks fail, we take
-  // the other one down to clean up nicely.
-  dns_task/Task? := null
-  http_task/Task? := null
-
-  // TODO(kasper): Should this be an Exception instance, so
-  // can preserve the stack trace? That would be nice.
-  error := null
-  result := null
-
-  done := monitor.Semaphore
-  dns_task = task::
-    try:
-      error = catch --trace: run_dns network
-    finally:
-      dns_task = null
-      if http_task: http_task.cancel
-      critical_do: done.up
-
-  http_task = task::
-    try:
-      error = catch --trace: result = run_http network access_points
-    finally:
-      http_task = null
-      if dns_task: dns_task.cancel
-      critical_do: done.up
-
-  remaining := 2
-  wait ::= :
-    while remaining > 0:
-      done.down
-      remaining--
-
-  try:
-    // Wait for both tasks to finish.
-    wait.call
-  finally:
-    if dns_task: dns_task.cancel
-    if http_task: http_task.cancel
-    critical_do --no-respect_deadline: wait.call
-
-  if error: throw error
-  return result
+run_captive_portal network/net.Interface access_points/List -> Map:
+  results := Task.group --required=1 [
+    :: run_dns network,
+    :: run_http network access_points,
+  ]
+  return results[1]  // Return the result from the HTTP server at index 1.
 
 run_dns network/net.Interface -> none:
   device_ip_address := network.address
@@ -155,7 +115,7 @@ run_dns network/net.Interface -> none:
   finally:
     socket.close
 
-run_http network/net.Interface access_points/List -> Map?:
+run_http network/net.Interface access_points/List -> Map:
   socket := network.tcp_listen 80
   server := http.Server
   result/Map? := null
@@ -169,39 +129,30 @@ run_http network/net.Interface access_points/List -> Map?:
   unreachable
 
 handle_http_request request/http.Request writer/http.ResponseWriter access_points/List -> Map?:
-  path := request.path
-  split := path.index_of "?"
-  parameters/Map? := null
-  if split >= 0:
-    tail := path[split + 1 .. ]
-    (tail.split "&").do: | parameter/string |
-      parts := parameter.split "="
-      if parts.size == 2:
-        if not parameters: parameters = {:}
-        key := (url.decode parts[0]).to_string
-        value := (url.decode parts[1]).to_string
-        parameters[key.trim] = value.trim
-    path = path[..split]
+  query := url.QueryString.parse request.path
+  resource := query.resource
+  if resource == "/": resource = "index.html"
+  if resource == "/hotspot-detect.html": resource = "index.html"  // Needed for iPhones.
+  if resource.starts_with "/": resource = resource[1..]
 
-  if path == "/": path = "index.html"
-  if path == "/hotspot-detect.html": path = "index.html"  // Needed for iPhones.
-  if path.starts_with "/": path = path[1..]
-
-  TEMPORARY_REDIRECTS.get path --if_present=:
+  TEMPORARY_REDIRECTS.get resource --if_present=:
     writer.headers.set "Location" it
     writer.write_headers 302
     return null
 
-  if path != "index.html":
+  if resource != "index.html":
     writer.headers.set "Content-Type" "text/plain"
     writer.write_headers 404
-    writer.write "Not found: $path"
+    writer.write "Not found: $resource"
     return null
 
   substitutions := {
     "access-points": (access_points.map: "$it.ssid<br>").join "\n"
   }
-
   writer.headers.set "Content-Type" "text/html"
   writer.write (INDEX.substitute: substitutions[it])
-  return parameters
+
+  if query.parameters.is_empty: return null
+  ssid := query.parameters["ssid"].trim
+  password := query.parameters["password"].trim
+  return { "ssid": ssid, "password": password }

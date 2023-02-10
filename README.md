@@ -9,6 +9,32 @@ end-user.
 The source code for this project is governed by a very permissive [license](LICENSE),
 so feel free to copy the code and use it for your own purposes.
 
+# Architecture
+
+The functionality of this example is split in two: The [application](src/main.toit)
+and the [setup](src/setup.toit). They are independent and installed in separate
+containers, because they never actually run at the same time. The idea is that the
+application can decide to go into setup mode and it does that by updating state
+stored in flash and rebooting. When the setup has completed, the setup does the
+ßreverse transition which reactivates the application with a (potentially) new
+configuration.
+
+### Container: Application
+The application is a small network-connected service that contacts an NTP
+server on the public internet as an example of using the configured WiFi. It can
+easily be extended to read measurements from sensors and publishing them through
+protocols like MQTT.
+
+### Container: Setup
+The setup functionality relies on establishing a WiFi in AP (access point) mode
+and running a captive portal that redirects users that connect to the WiFi to
+a web page that asks them to update the WiFi credentials.
+
+It uses a simple DNS server to capture users and it runs an HTTP server that
+serves a web page with a submittable form that contains the updated SSID and
+password. The web page also lists the access points the device can see to make
+it easier to pick the right one.
+
 # Development
 
 For development, I recommend using [Jaguar](https://github.com/toitlang/jaguar) and
