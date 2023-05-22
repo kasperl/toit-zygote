@@ -1,4 +1,6 @@
+sdk: ^2.0.0-alpha.69
 prefixes:
+  artemis: toit-artemis
   dns_simple_server: pkg-dns-simple-server
   http: pkg-http
   ntp: pkg-ntp
@@ -15,3 +17,7 @@ packages:
     url: github.com/toitlang/pkg-ntp
     version: 1.0.0
     hash: 1c3cc4a4819f459393f00efc576f66f838665719
+  toit-artemis:
+    url: github.com/toitware/toit-artemis
+    version: 0.4.0
+    hash: 346cb804bb72b4ee7126a30f389d78a5e44e0d31

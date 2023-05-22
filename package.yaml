@@ -1,4 +1,7 @@
 dependencies:
+  artemis:
+    url: github.com/toitware/toit-artemis
+    version: ^0.4.0
   dns_simple_server:
     url: github.com/toitlang/pkg-dns-simple-server
     version: ^0.2.1
