@@ -17,6 +17,12 @@ import dns_simple_server as dns
 
 import .mode as mode
 
+// When running in development we run for less time before we
+// back to trying out the app. This makes it faster to correct
+// things and retry, but it does mean that you have less time
+// to connect to the established WiFi.
+TIMEOUT ::= mode.DEVELOPMENT ? (Duration --s=30) : (Duration --m=3)
+
 CAPTIVE_PORTAL_SSID     ::= "mywifi"
 CAPTIVE_PORTAL_PASSWORD ::= "12345678"
 
@@ -53,19 +59,15 @@ main:
   // the -D jag.disabled flag in development.
   if mode.RUNNING: return
 
-  // When running in development we run for less time before we
-  // back to trying out the app. This makes it faster to correct
-  // things and retry, but it does mean that you have less time
-  // to connect to the established WiFi.
-  timeout := mode.DEVELOPMENT ? (Duration --s=30) : (Duration --m=3)
-  catch --unwind=(: it != DEADLINE_EXCEEDED_ERROR): run timeout
+  // Run until we're out of time.
+  catch --unwind=(: it != DEADLINE_EXCEEDED_ERROR): run
 
   // We're done trying to complete the setup. Go back to running
   // the application and let it choose when to re-initiate the
   // setup process.
   mode.run_application
 
-run timeout/Duration:
+run timeout/Duration=TIMEOUT:
   log.info "scanning for wifi access points"
   channels := ByteArray 12: it + 1
   access_points := wifi.scan channels
