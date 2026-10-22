@@ -24,8 +24,9 @@ main:
   ]
 
   // Start the HTTP server in a separate task on a fixed local port.
+  submitted/Map? := null
   server_task := task::
-    setup.run_http network access_points --port=8080
+    submitted = setup.run_http network access_points --port=8080
 
   // Give the server a moment to start listening.
   sleep --ms=500
@@ -52,7 +53,17 @@ main:
     // Unknown resources return 404.
     response = client.get --host="127.0.0.1" --port=8080 --path="/does-not-exist.txt"
     expect_equals 404 response.status_code
+
+    // Submitting credentials trims the SSID, but preserves leading and
+    // trailing spaces in the WPA2 password.
+    response = client.get --host="127.0.0.1" --port=8080 --path="/?ssid=%20MyNetwork%20&password=%20secret%20"
+    expect_equals 200 response.status_code
+    read_body_ response
   finally:
     client.close
     network.close
     server_task.cancel
+
+  expect_not_null submitted
+  expect_equals "MyNetwork" submitted["ssid"]
+  expect_equals " secret " submitted["password"]

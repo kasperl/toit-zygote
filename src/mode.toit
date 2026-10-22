@@ -15,18 +15,29 @@ run_application -> none:
   esp32.deep_sleep (Duration --ms=10)
 
 run_setup -> none:
-  ZYGOTE_STORE_[ZYGOTE_STATE_KEY_] = ZYGOTE_STATE_SETUP_
+  // Never persist the "setup" state from an unvalidated OTA image:
+  // `esp32.deep_sleep` before `firmware.validate` causes the ESP-IDF
+  // bootloader to abort the new image and roll back to the previous
+  // slot, which would otherwise wake up stuck in setup mode.
+  if not firmware.is_validation_pending:
+    ZYGOTE_STORE_[ZYGOTE_STATE_KEY_] = ZYGOTE_STATE_SETUP_
   esp32.deep_sleep (Duration --ms=10)
 
 has_wifi_configuration -> bool:
   if has_firmware_wifi_configuration_: return true
+  // An image booting with `is_validation_pending` was just installed
+  // over the network via OTA; always let the application try `net.open`
+  // with the SDK's saved NVS credentials even if the previous firmware
+  // predated the zygote `wifi-configured` flag.
+  if firmware.is_validation_pending: return true
   return ZYGOTE_STORE_.get ZYGOTE_WIFI_CONFIGURED_KEY_ --if-absent=(: false)
 
 mark_wifi_configured -> none:
   ZYGOTE_STORE_[ZYGOTE_WIFI_CONFIGURED_KEY_] = true
 
 clear_wifi_configured -> none:
-  ZYGOTE_STORE_.remove ZYGOTE_WIFI_CONFIGURED_KEY_
+  if not firmware.is_validation_pending:
+    ZYGOTE_STORE_.remove ZYGOTE_WIFI_CONFIGURED_KEY_
 
 is_missing_wifi_configuration_error exception/any -> bool:
   return "$exception".contains "wifi ssid not provided"

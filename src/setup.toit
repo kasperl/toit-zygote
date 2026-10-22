@@ -113,10 +113,12 @@ run_ timeout/Duration? --ssid/string --password/string:
     if credentials:
       exception := catch:
         log.info "connecting to wifi in STA mode" --tags=credentials
-        network_sta := wifi.open
-            --save
-            --ssid=credentials["ssid"]
-            --password=credentials["password"]
+        network_sta/net.Interface? := null
+        with_timeout (Duration --s=30):
+          network_sta = wifi.open
+              --save
+              --ssid=credentials["ssid"]
+              --password=credentials["password"]
         // The --save flag has now persisted the credentials to SDK
         // storage.  Mark the zygote bucket flag *before* closing the
         // interface so that even if `network_sta.close` throws, the
@@ -176,7 +178,14 @@ run_http network/net.Interface access_points/List --port/int=80 -> Map:
     socket.close
   unreachable
 
+escape_html_ text/string -> string:
+  text = text.replace --all "&" "&amp;"
+  text = text.replace --all "<" "&lt;"
+  text = text.replace --all ">" "&gt;"
+  return text.replace --all "\"" "&quot;"
+
 handle_http_request_ request/http.Request writer/http.ResponseWriter access_points/List -> Map?:
+  writer.headers.set "Connection" "close"
   query := url.QueryString.parse request.path
   resource := query.resource
   if resource == "/": resource = "index.html"
@@ -204,9 +213,15 @@ handle_http_request_ request/http.Request writer/http.ResponseWriter access_poin
     else:
       writer.headers.set "Content-Type" "application/octet-stream"
 
-    if resource == "index.html":
+    is_gzipped := asset is ByteArray and asset.size >= 2 and asset[0] == 0x1f and asset[1] == 0x8b
+    if is_gzipped:
+      writer.headers.set "Content-Encoding" "gzip"
+      writer.write asset
+      if resource != "index.html":
+        return null
+    else if resource == "index.html":
       substitutions := {
-        "access-points": (access_points.map: "$it.ssid<br>").join "\n"
+        "access-points": (access_points.map: "$(escape_html_ it.ssid)<br>").join "\n"
       }
       str := asset.to_string
       writer.write (str.substitute: substitutions.get it --if_absent=(: "{{$it}}"))
@@ -221,7 +236,7 @@ handle_http_request_ request/http.Request writer/http.ResponseWriter access_poin
     return null
   else:
     substitutions := {
-      "access-points": (access_points.map: "$it.ssid<br>").join "\n",
+      "access-points": (access_points.map: "$(escape_html_ it.ssid)<br>").join "\n",
       "css-link": (ASSETS.contains "style.css") ? "<link rel=\"stylesheet\" href=\"style.css\">\n" : "",
     }
     writer.headers.set "Content-Type" "text/html"
@@ -229,7 +244,12 @@ handle_http_request_ request/http.Request writer/http.ResponseWriter access_poin
 
   if query.parameters.is_empty: return null
   ssid := query.parameters.get "ssid"
-  password := query.parameters.get "password"
-  if ssid and password:
-    return { "ssid": ssid.trim, "password": password.trim }
+  password := query.parameters.get "password" --if_absent=(: "")
+  if ssid is string and password is string:
+    trimmed_ssid := ssid.trim
+    if trimmed_ssid != "":
+      // Do not trim the password: leading/trailing spaces are legal in
+      // WPA2 passphrases, and stripping them silently prevents the
+      // device from ever associating.
+      return { "ssid": trimmed_ssid, "password": password }
   return null
