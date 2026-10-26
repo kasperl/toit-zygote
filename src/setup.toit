@@ -90,10 +90,10 @@ run_ timeout/Duration? --ssid/string --password/string:
   log.info "scanning for wifi access points"
   channels := ByteArray 12: it + 1
   access_points/List := []
-  scan-exception := catch:
+  scan_exception := catch:
     access_points = wifi.scan channels
     access_points.sort --in_place: | a b | b.rssi.compare_to a.rssi
-  if scan-exception:
+  if scan_exception:
     log.warn "wifi access point scan failed; continuing without scan results"
 
   log.info "establishing wifi in AP mode ($ssid)"
@@ -167,7 +167,7 @@ Exposed primarily so tests and advanced callers can drive the HTTP
 */
 run_http network/net.Interface access_points/List --port/int=80 -> Map:
   socket := network.tcp_listen port
-  server := http.Server --max-tasks=4
+  server := http.Server --max_tasks=4
   result/Map? := null
   try:
     server.listen socket:: | request writer |

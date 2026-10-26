@@ -3,6 +3,7 @@ import net
 import http
 import encoding.json
 
+import zygote.mode as mode
 import zygote.setup as setup
 
 class MockAccessPoint:
@@ -17,10 +18,13 @@ read_body_ response/http.Response -> string:
   return bytes.to_string
 
 main:
+  expect (mode.is_missing_wifi_configuration_error "WIFI_CONNECT_FAILED: wifi ssid not provided")
+  expect (not mode.is_missing_wifi_configuration_error "WIFI_CONNECT_FAILED: auth_fail")
+
   network := net.open
   access_points := [
     MockAccessPoint "MyNetwork" -50,
-    MockAccessPoint "OtherNetwork" -70,
+    MockAccessPoint "Other<script>alert(1)</script>" -70,
   ]
 
   // Start the HTTP server in a separate task on a fixed local port.
@@ -34,13 +38,20 @@ main:
   client := http.Client network
   try:
     // The default index is served when no custom assets are bundled,
-    // and it should list the scanned access points.
+    // and it should list the scanned access points with HTML escaping.
     response := client.get --host="127.0.0.1" --port=8080 --path="/"
     expect_equals 200 response.status_code
+    expect_equals "close" (response.headers.single "Connection")
     body := read_body_ response
     expect (body.contains "Update WiFi settings")
     expect (body.contains "MyNetwork")
-    expect (body.contains "OtherNetwork")
+    expect (body.contains "Other&lt;script&gt;alert(1)&lt;/script&gt;")
+    expect (not body.contains "<script>alert(1)</script>")
+
+    // Apple captive-portal detection path serves index.html.
+    response = client.get --host="127.0.0.1" --port=8080 --path="/hotspot-detect.html"
+    expect_equals 200 response.status_code
+    expect ((read_body_ response).contains "Update WiFi settings")
 
     // The access-points endpoint exposes the cached scan as JSON.
     response = client.get --host="127.0.0.1" --port=8080 --path="/access-points.json"
@@ -53,6 +64,7 @@ main:
     // Unknown resources return 404.
     response = client.get --host="127.0.0.1" --port=8080 --path="/does-not-exist.txt"
     expect_equals 404 response.status_code
+    read_body_ response
 
     // Submitting credentials trims the SSID, but preserves leading and
     // trailing spaces in the WPA2 password.

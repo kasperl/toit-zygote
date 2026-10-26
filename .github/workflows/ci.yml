@@ -32,9 +32,23 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Resolve Toit version
+        id: resolve-toit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MATRIX_VERSION: ${{ matrix.toit-version }}
+        run: |
+          if [ "$MATRIX_VERSION" = "latest" ]; then
+            VERSION=$(gh api repos/toitlang/toit/releases?per_page=20 --jq '[.[] | select(.tag_name | startswith("v2."))][0].tag_name')
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$MATRIX_VERSION" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: toitlang/action-setup@v1
         with:
-          toit-version: ${{ matrix.toit-version }}
+          toit-version: ${{ steps.resolve-toit.outputs.version }}
 
       - name: Test
         run: make test

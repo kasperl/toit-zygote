@@ -30,7 +30,7 @@ has_wifi_configuration -> bool:
   // with the SDK's saved NVS credentials even if the previous firmware
   // predated the zygote `wifi-configured` flag.
   if firmware.is_validation_pending: return true
-  return ZYGOTE_STORE_.get ZYGOTE_WIFI_CONFIGURED_KEY_ --if-absent=(: false)
+  return ZYGOTE_STORE_.get ZYGOTE_WIFI_CONFIGURED_KEY_ --if_absent=(: false)
 
 mark_wifi_configured -> none:
   ZYGOTE_STORE_[ZYGOTE_WIFI_CONFIGURED_KEY_] = true

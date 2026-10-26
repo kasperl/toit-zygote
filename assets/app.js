@@ -20,10 +20,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     const div = document.createElement("div");
                     div.className = "network-item";
 
-                    div.innerHTML = `
-                        <span class="network-ssid">${network.ssid}</span>
-                        <span class="network-rssi">${network.rssi} dBm</span>
-                    `;
+                    const ssidSpan = document.createElement("span");
+                    ssidSpan.className = "network-ssid";
+                    ssidSpan.textContent = network.ssid;
+
+                    const rssiSpan = document.createElement("span");
+                    rssiSpan.className = "network-rssi";
+                    rssiSpan.textContent = `${network.rssi} dBm`;
+
+                    div.appendChild(ssidSpan);
+                    div.appendChild(rssiSpan);
 
                     div.addEventListener("click", () => {
                         ssidInput.value = network.ssid;
@@ -37,6 +43,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error("Failed to fetch networks:", error);
                 list.innerHTML = "<p>Error loading networks. Please reload.</p>";
             });
+    }
+
+    const refreshBtn = document.getElementById("refresh-btn");
+    if (refreshBtn) {
+        refreshBtn.addEventListener("click", fetchNetworks);
     }
 
     fetchNetworks();

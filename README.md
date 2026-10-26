@@ -72,6 +72,12 @@ There are three main ways to customize the portal:
 ### Setting Assets
 To inject these assets during development, you can create them with the 
 `toit tool assets` command, or simply pass the `--assets` flag to Jaguar.
+Assets may also be pre-compressed with `gzip` before adding them (detected
+automatically by the `0x1f 0x8b` gzip header and served with
+`Content-Encoding: gzip`). Note that `{{access-points}}` template substitution
+only runs on uncompressed `index.html`; gzip-compressed `index.html` pages
+should fetch `/access-points.json` via JavaScript instead.
+
 However, since the Jaguar command line might not directly pack a folder of
 assets, you can create an encoded assets file first:
 ``` sh
