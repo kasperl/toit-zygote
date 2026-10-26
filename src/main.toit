@@ -27,9 +27,9 @@ main:
   // hang indefinitely when no credentials are available instead
   // of returning the "wifi ssid not provided" error to the
   // caller.
-  if not mode.has_wifi_configuration:
+  if not mode.has-wifi-configuration:
     log.info "wifi has never been configured; entering setup mode"
-    mode.run_setup
+    mode.run-setup
     return
 
   retries := 0
@@ -37,20 +37,20 @@ main:
     network/net.Interface? := null
     exception := catch --trace:
       network = net.open
-      mode.mark_wifi_configured
+      mode.mark-wifi-configured
       run network
       retries = 0
     if network: network.close
-    if exception and mode.is_missing_wifi_configuration_error exception:
+    if exception and mode.is-missing-wifi-configuration-error exception:
       log.info "wifi is not configured; entering setup mode"
-      mode.clear_wifi_configured
-      mode.run_setup
+      mode.clear-wifi-configured
+      mode.run-setup
     sleep PERIOD
 
   // We keep failing to connect or run the app. We assume
   // that this is because we've got the wrong WiFi credentials
   // so we enter the setup mode.
-  mode.run_setup
+  mode.run-setup
 
 run network/net.Interface:
   tags/Map? := null

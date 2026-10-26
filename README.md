@@ -174,14 +174,14 @@ toit pkg install github.com/kasperl/toit-zygote
 Your setup container can then be as small as:
 
 ``` toit
-import zygote.setup show run_captive_portal_setup
+import zygote.setup show run-captive-portal-setup
 
 main:
   // Use an empty password to bring up an open access point. The
   // captive portal is the only thing the user needs to reach in order
   // to complete provisioning, and shipping a default password that has
   // to be looked up in the documentation tends to confuse end users.
-  run_captive_portal_setup --ssid="my-device" --password=""
+  run-captive-portal-setup --ssid="my-device" --password=""
 ```
 
 In your application container, drive the retry loop and hand control
@@ -201,8 +201,8 @@ main:
   // because the SDK's WiFi service can hang indefinitely when no
   // credentials are available instead of returning the
   // "wifi ssid not provided" error to the caller.
-  if not mode.has_wifi_configuration:
-    mode.run_setup
+  if not mode.has-wifi-configuration:
+    mode.run-setup
     return
 
   retries := 0
@@ -210,22 +210,22 @@ main:
     network/net.Interface? := null
     exception := catch --trace:
       network = net.open
-      mode.mark_wifi_configured
+      mode.mark-wifi-configured
       run network
       retries = 0
     if network: network.close
-    if exception and mode.is_missing_wifi_configuration_error exception:
-      mode.clear_wifi_configured
-      mode.run_setup
+    if exception and mode.is-missing-wifi-configuration-error exception:
+      mode.clear-wifi-configured
+      mode.run-setup
     sleep PERIOD
 
   // Persistently failing means the saved credentials are likely
   // wrong; reboot into setup mode.
-  mode.run_setup
+  mode.run-setup
 ```
 
-`mode.run_setup` reboots the device into setup mode, and
-`mode.run_application` does the reverse. `mode.has_wifi_configuration`
+`mode.run-setup` reboots the device into setup mode, and
+`mode.run-application` does the reverse. `mode.has-wifi-configuration`
 returns true if either the firmware was built with WiFi credentials
-(`wifi.ssid` in the firmware config) or `mode.mark_wifi_configured`
+(`wifi.ssid` in the firmware config) or `mode.mark-wifi-configured`
 has been called previously.
