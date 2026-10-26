@@ -66,16 +66,43 @@ main:
     expect-equals 404 response.status-code
     read-body_ response
 
-    // Submitting credentials trims the SSID, but preserves leading and
-    // trailing spaces in the WPA2 password.
+    // Submitting credentials via GET trims the SSID, preserves leading and
+    // trailing spaces in the WPA2 password, and returns the confirmation page.
     response = client.get --host="127.0.0.1" --port=8080 --path="/?ssid=%20MyNetwork%20&password=%20secret%20"
     expect-equals 200 response.status-code
-    read-body_ response
+    confirm-body := read-body_ response
+    expect (confirm-body.contains "Connecting to MyNetwork...")
   finally:
     client.close
-    network.close
     server-task.cancel
 
   expect-not-null submitted
   expect-equals "MyNetwork" submitted["ssid"]
   expect-equals " secret " submitted["password"]
+
+  // Also test submitting credentials via POST application/x-www-form-urlencoded.
+  submitted-post/Map? := null
+  server-task-post := task::
+    submitted-post = setup.run-http network access-points --port=8081
+
+  sleep --ms=500
+
+  client-post := http.Client network
+  try:
+    headers := http.Headers
+    headers.set "Content-Type" "application/x-www-form-urlencoded"
+    response := client-post.post "ssid=%20PostNet%20&password=p%2B1%20".to-byte-array
+        --host="127.0.0.1"
+        --port=8081
+        --path="/"
+        --headers=headers
+    expect-equals 200 response.status-code
+    expect ((read-body_ response).contains "Connecting to PostNet...")
+  finally:
+    client-post.close
+    network.close
+    server-task-post.cancel
+
+  expect-not-null submitted-post
+  expect-equals "PostNet" submitted-post["ssid"]
+  expect-equals "p+1 " submitted-post["password"]

@@ -37,7 +37,7 @@ DEFAULT-INDEX ::= """
 {{css-link}}  </head>
   <body>
     <h1>Update WiFi settings</h1>
-    <form>
+    <form method="POST" action="/">
       <label for="ssid">SSID:</label><br>
       <input type="text" id="ssid" name="ssid" autocorrect="off" autocapitalize="none"><br>
       <label for="password">Password:</label><br>
@@ -50,6 +50,20 @@ DEFAULT-INDEX ::= """
   </body>
 </html>
 """
+
+DEFAULT-CONNECTING ::= """
+<html>
+  <head>
+    <title>Connecting...</title>
+{{css-link}}  </head>
+  <body>
+    <h1>Connecting to {{ssid}}...</h1>
+    <p>The device is now trying to join the network. You can close this page.</p>
+  </body>
+</html>
+"""
+
+MAX-FORM-BODY-BYTES_ ::= 1024
 
 main:
   run-captive-portal-setup
@@ -108,11 +122,15 @@ run_ timeout/Duration? --ssid/string --password/string:
       else:
         credentials = run-captive-portal_ network-ap access-points
     finally:
+      // Give the TCP stack and WiFi AP a brief moment to transmit the final
+      // HTTP response packets before tearing down the SoftAP interface.
+      if credentials: sleep --ms=100
       network-ap.close
 
     if credentials:
+      tags := {"ssid": credentials["ssid"]}
       exception := catch:
-        log.info "connecting to wifi in STA mode" --tags=credentials
+        log.info "connecting to wifi in STA mode" --tags=tags
         network-sta/net.Interface? := null
         with-timeout (Duration --s=30):
           network-sta = wifi.open
@@ -127,9 +145,9 @@ run_ timeout/Duration? --ssid/string --password/string:
         // re-enter setup mode despite valid credentials being saved.
         mode.mark-wifi-configured
         network-sta.close
-        log.info "connecting to wifi in STA mode => success" --tags=credentials
+        log.info "connecting to wifi in STA mode => success" --tags=tags
         return
-      log.warn "connecting to wifi in STA mode => failed" --tags=credentials
+      log.warn "connecting to wifi in STA mode => failed" --tags=tags
 
 run-captive-portal_ network/net.Interface access-points/List -> Map:
   results := Task.group --required=1 [
@@ -184,6 +202,31 @@ escape-html_ text/string -> string:
   text = text.replace --all ">" "&gt;"
   return text.replace --all "\"" "&quot;"
 
+extract-credentials_ parameters/Map -> Map?:
+  if parameters.is-empty: return null
+  ssid := parameters.get "ssid"
+  password := parameters.get "password" --if-absent=(: "")
+  if ssid is string and password is string:
+    trimmed-ssid := ssid.trim
+    if trimmed-ssid != "":
+      // Do not trim the password: leading/trailing spaces are legal in
+      // WPA2 passphrases, and stripping them silently prevents the
+      // device from ever associating.
+      return { "ssid": trimmed-ssid, "password": password }
+  return null
+
+read-post-parameters_ request/http.Request -> Map:
+  if request.method != "POST": return {:}
+  bytes := #[]
+  while chunk := request.body.read:
+    if bytes.size + chunk.size > MAX-FORM-BODY-BYTES_: return {:}
+    bytes += chunk
+  if bytes.is-empty: return {:}
+  str := ""
+  catch: str = bytes.to-string
+  if str == "": return {:}
+  return (url.QueryString.parse "?$str").parameters
+
 handle-http-request_ request/http.Request writer/http.ResponseWriter access-points/List -> Map?:
   writer.headers.set "Connection" "close"
   query := url.QueryString.parse request.path
@@ -202,6 +245,19 @@ handle-http-request_ request/http.Request writer/http.ResponseWriter access-poin
     writer.write (json.encode (access-points.map: { "ssid": it.ssid, "rssi": it.rssi }))
     return null
 
+  if resource == "index.html":
+    credentials := extract-credentials_ query.parameters
+    if not credentials and request.method == "POST":
+      credentials = extract-credentials_ (read-post-parameters_ request)
+    if credentials:
+      substitutions := {
+        "ssid": escape-html_ credentials["ssid"],
+        "css-link": (ASSETS.contains "style.css") ? "<link rel=\"stylesheet\" href=\"style.css\">\n" : "",
+      }
+      writer.headers.set "Content-Type" "text/html"
+      writer.write (DEFAULT-CONNECTING.substitute: substitutions.get it --if-absent=(: "{{$it}}"))
+      return credentials
+
   asset := ASSETS.get resource
   if asset:
     if resource.ends-with ".html":
@@ -217,8 +273,6 @@ handle-http-request_ request/http.Request writer/http.ResponseWriter access-poin
     if is-gzipped:
       writer.headers.set "Content-Encoding" "gzip"
       writer.write asset
-      if resource != "index.html":
-        return null
     else if resource == "index.html":
       substitutions := {
         "access-points": (access-points.map: "$(escape-html_ it.ssid)<br>").join "\n"
@@ -227,29 +281,18 @@ handle-http-request_ request/http.Request writer/http.ResponseWriter access-poin
       writer.write (str.substitute: substitutions.get it --if-absent=(: "{{$it}}"))
     else:
       writer.write asset
-      // Static assets are not credential submissions; we are done.
-      return null
-  else if resource != "index.html":
+    return null
+
+  if resource != "index.html":
     writer.headers.set "Content-Type" "text/plain"
     writer.write-headers 404
     writer.write "Not found: $resource"
     return null
-  else:
-    substitutions := {
-      "access-points": (access-points.map: "$(escape-html_ it.ssid)<br>").join "\n",
-      "css-link": (ASSETS.contains "style.css") ? "<link rel=\"stylesheet\" href=\"style.css\">\n" : "",
-    }
-    writer.headers.set "Content-Type" "text/html"
-    writer.write (DEFAULT-INDEX.substitute: substitutions.get it --if-absent=(: "{{$it}}"))
 
-  if query.parameters.is-empty: return null
-  ssid := query.parameters.get "ssid"
-  password := query.parameters.get "password" --if-absent=(: "")
-  if ssid is string and password is string:
-    trimmed-ssid := ssid.trim
-    if trimmed-ssid != "":
-      // Do not trim the password: leading/trailing spaces are legal in
-      // WPA2 passphrases, and stripping them silently prevents the
-      // device from ever associating.
-      return { "ssid": trimmed-ssid, "password": password }
+  substitutions := {
+    "access-points": (access-points.map: "$(escape-html_ it.ssid)<br>").join "\n",
+    "css-link": (ASSETS.contains "style.css") ? "<link rel=\"stylesheet\" href=\"style.css\">\n" : "",
+  }
+  writer.headers.set "Content-Type" "text/html"
+  writer.write (DEFAULT-INDEX.substitute: substitutions.get it --if-absent=(: "{{$it}}"))
   return null
