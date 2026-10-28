@@ -1,3 +1,7 @@
+name: zygote
+description: Zygote-style two-container setup that lets a Toit application gracefully fall back to a captive-portal WiFi provisioning mode.
+environment:
+  sdk: ^2.0.0-alpha.190
 dependencies:
   dns_simple_server:
     url: github.com/toitlang/pkg-dns-simple-server

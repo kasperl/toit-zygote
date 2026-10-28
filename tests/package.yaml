@@ -1,0 +1,6 @@
+dependencies:
+  zygote:
+    path: ..
+  http:
+    url: github.com/toitlang/pkg-http
+    version: ^2.12.0

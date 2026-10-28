@@ -1,0 +1,54 @@
+# Zero-Clause BSD License
+# Copyright (C) 2024 Toitware ApS.
+
+name: CI
+
+on:
+  push:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        toit-version: [ v2.0.0-alpha.190, latest ]
+        # Some toit releases ship without a toit-windows.tar.gz asset.
+        # When that happens we still want CI to succeed; the pinned
+        # windows + v2.0.0-alpha.190 leg gives us real Windows
+        # coverage either way.
+        include:
+          - os: windows-latest
+            toit-version: latest
+            allow-failure: true
+
+    name: CI - ${{ matrix.os }} - ${{ matrix.toit-version }}
+
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.allow-failure == true }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve Toit version
+        id: resolve-toit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MATRIX_VERSION: ${{ matrix.toit-version }}
+        run: |
+          if [ "$MATRIX_VERSION" = "latest" ]; then
+            VERSION=$(gh api repos/toitlang/toit/releases?per_page=20 --jq '[.[] | select(.tag_name | startswith("v2."))][0].tag_name')
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$MATRIX_VERSION" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: toitlang/action-setup@v1
+        with:
+          toit-version: ${{ steps.resolve-toit.outputs.version }}
+
+      - name: Test
+        run: make test

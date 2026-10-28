@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WiFi Settings</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="background-blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <div class="container">
+    <header class="glass-panel">
+      <h1>WiFi Setup</h1>
+    </header>
+
+    <main class="glass-panel">
+      <p>Configure WiFi for your device.</p>
+
+      <form action="/" method="POST" id="wifi-form">
+        <div class="form-group">
+          <label for="ssid">SSID (Network Name)</label>
+          <input type="text" id="ssid" name="ssid" required autocorrect="off" autocapitalize="none" placeholder="Select a network below or type here">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" autocorrect="off" autocapitalize="none" placeholder="Enter password">
+        </div>
+
+        <button type="submit" class="primary-btn">Connect</button>
+      </form>
+
+      <div class="networks-section">
+        <h2>Available Networks</h2>
+        <div class="network-list">
+          {{access-points}}
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
